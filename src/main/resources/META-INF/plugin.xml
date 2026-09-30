@@ -1,0 +1,89 @@
+<idea-plugin>
+    <id>rsm.jetbrains</id>
+    <name>RSM</name>
+    <version>0.2.0</version>
+    <vendor>RSM Contributors</vendor>
+
+    <description><![CDATA[
+        <p>Replay State Memory (RSM) integration for JetBrains IDEs.</p>
+        <p>Bundles a Node 22 sidecar hosting <code>rsm-agent</code> (MCP server).
+        Transport: MCP over stdio only. Backend-only execution (Local, Split Mode, Gateway safe).</p>
+        <p><b>0.2.0</b> adds the RSM Console tool window on the right rail, an
+        auto-provisioned RSM Home, an automatic memory tier, a Source &amp; Context
+        drawer with Auto Feed run-scoped cleanup, and a Trace tab that operationalizes
+        the E2E correlation-id verification criterion. No backend contract changes.</p>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <h3>0.2.0</h3>
+        <ul>
+          <li>Right-rail tool window <b>RSM</b> with four tabs: Runtime, Sources, Trace, Settings.</li>
+          <li>Zero-configuration first run: RSM Home auto-provisioned, demo source seeded, sidecar auto-starts.</li>
+          <li>Automatic memory tiering (256/512/1024 MB) based on total physical RAM.</li>
+          <li>Actions now extend AnAction — discoverable in Find Action (Ctrl/Cmd+Shift+A).</li>
+          <li>Trace tab captures every MCP call with a matched <code>rsm.callId</code>.</li>
+          <li>Auto Feed toggle: attached sources are auto-cleaned on run boundary.</li>
+          <li>Settings persisted via PersistentStateComponent (RoamingType.DISABLED).</li>
+          <li>No changes to MCP surface, HostError kinds, or the 5-state runtime vocabulary.</li>
+        </ul>
+    ]]></change-notes>
+
+    <idea-version since-build="261"/>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="rsm.jetbrains.host.RsmRuntimeService"/>
+        <applicationService serviceImplementation="rsm.jetbrains.config.RsmSettingsState"/>
+        <notificationGroup id="rsm.notifications" displayType="BALLOON"/>
+
+        <toolWindow id="RSM"
+                    anchor="right"
+                    factoryClass="rsm.jetbrains.ui.toolwindow.RsmToolWindowFactory"
+                    icon="/icons/rsm.svg"/>
+
+        <applicationConfigurable parentId="tools"
+                                 instance="rsm.jetbrains.ui.settings.RsmConfigurable"
+                                 id="rsm.jetbrains.settings"
+                                 displayName="RSM"/>
+    </extensions>
+
+    <applicationListeners>
+        <listener class="rsm.jetbrains.lifecycle.RsmShutdownListener"
+                  topic="com.intellij.ide.AppLifecycleListener"/>
+    </applicationListeners>
+
+    <actions>
+        <action id="rsm.showConsole"
+                class="rsm.jetbrains.ui.actions.ShowConsoleAction"
+                text="RSM: Show Console"
+                description="Open the RSM tool window on the right rail."
+                icon="/icons/rsm_action.svg">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action id="rsm.showStatus"
+                class="rsm.jetbrains.ui.actions.ShowStatusAction"
+                text="RSM: Show Runtime Status"
+                description="Show the current RSM runtime state (OFF/READY/ACTIVE/UNAVAILABLE/ERROR).">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action id="rsm.restartRuntime"
+                class="rsm.jetbrains.ui.actions.RestartRuntimeAction"
+                text="RSM: Restart Runtime"
+                description="Restart the bundled Node sidecar and rsm-agent.">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action id="rsm.registerSource"
+                class="rsm.jetbrains.ui.actions.RegisterSourceAction"
+                text="RSM: Register Source…"
+                description="Register a new external source reference with RSM.">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action id="rsm.replaySource"
+                class="rsm.jetbrains.ui.actions.ReplaySourceAction"
+                text="RSM: Replay Source…"
+                description="Replay a previously-registered source_id via rsm_replay.">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

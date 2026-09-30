@@ -1,0 +1,20 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node runtime cache (fetched by prepareNodeRuntimes)
+build/node-runtimes/
+
+# Test scratch
+build/verification-logs/

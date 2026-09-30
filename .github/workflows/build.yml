@@ -1,0 +1,105 @@
+# .github/workflows/build.yml
+# GitHub Actions workflow that produces the four native-variant JetBrains plugin ZIPs.
+# Trigger: push to any branch, or manual "Run workflow" button.
+#
+# Output: workflow run artifacts named `rsm-jetbrains-0.2.0-<target>.zip`, downloadable from the
+# "Artifacts" section of the run summary page.
+#
+# On a git tag matching v0.2.*, the ZIPs are also attached to a GitHub Release automatically.
+
+name: build
+
+on:
+  push:
+    branches: ["**"]
+    tags:     ["v*.*.*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & package plugin
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: write   # required by softprops/action-gh-release when a tag triggers the run
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
+          cache-read-only: false
+
+      - name: Verify Gradle version
+        run: ./gradlew --version
+
+      - name: Prepare bundled Node 22 runtimes (SHA-256 verified against nodejs.org)
+        run: ./gradlew prepareNodeRuntimes --console=plain
+
+      - name: Build universal plugin
+        run: ./gradlew buildPlugin --console=plain
+
+      - name: Build native variants (Linux x64, macOS x64, macOS arm64, Windows x64)
+        run: |
+          ./gradlew \
+            buildPlugin-linux-x64 \
+            buildPlugin-macos-x64 \
+            buildPlugin-macos-arm64 \
+            buildPlugin-windows-x64 \
+            --console=plain
+
+      - name: Run unit tests
+        run: ./gradlew test --console=plain
+        continue-on-error: false
+
+      - name: Run IntelliJ Plugin Verifier against IDEA 2026.1+
+        run: ./gradlew verifyPlugin --console=plain
+        continue-on-error: true   # warnings from verifier should not block the build
+
+      - name: SHA-256 of every published artifact
+        run: |
+          echo "### SHA-256 of build/distributions" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          sha256sum build/distributions/*.zip >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload universal ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: rsm-jetbrains-universal
+          path: build/distributions/rsm-jetbrains-*.zip
+          if-no-files-found: error
+
+      - name: Upload native-variant ZIPs individually
+        uses: actions/upload-artifact@v4
+        with:
+          name: rsm-jetbrains-native-variants
+          path: |
+            build/distributions/rsm-jetbrains-*-linux-x64.zip
+            build/distributions/rsm-jetbrains-*-macos-x64.zip
+            build/distributions/rsm-jetbrains-*-macos-arm64.zip
+            build/distributions/rsm-jetbrains-*-windows-x64.zip
+          if-no-files-found: error
+
+      - name: Publish GitHub Release on tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/distributions/rsm-jetbrains-*-linux-x64.zip
+            build/distributions/rsm-jetbrains-*-macos-x64.zip
+            build/distributions/rsm-jetbrains-*-macos-arm64.zip
+            build/distributions/rsm-jetbrains-*-windows-x64.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true
